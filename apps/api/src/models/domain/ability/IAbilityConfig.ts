@@ -1,6 +1,7 @@
-import type { AbilityId, TargetType } from '@incursion/dto'
+import type { AbilityId, IIncursionEventDto, TargetType } from '@incursion/dto'
 import type Entity from '../entity/Entity'
 import type Incursion from '../incursion/Incursion'
+import type ActionParams from '../incursion/ActionParams'
 
 export default interface IAbilityConfig {
   abilityId: AbilityId
@@ -8,6 +9,6 @@ export default interface IAbilityConfig {
   description: string
   cooldown: number
   targetType: TargetType
-  effect: (user: Entity, context: Incursion) => void
-  condition: (user: Entity, context: Incursion) => boolean
+  effect: (user: Entity, context: Incursion, params: ActionParams) => IIncursionEventDto | null
+  condition: (user: Entity, context: Incursion, params: ActionParams) => boolean
 }

@@ -1,13 +1,27 @@
+import type { IIncursionActionDto } from '@incursion/dto'
 import type { Server, Socket } from 'socket.io'
 import type IncursionManager from '../../managers/IncursionManager'
+import { AbilityId } from '@incursion/dto'
 import IncursionGenerator from '../../generators/IncursionGenerator'
 import CharacterMapper from '../../mappers/entity/CharacterMapper'
 import IncursionMapper from '../../mappers/incursion/IncursionMapper'
 import IncursionTemplateMapper from '../../mappers/incursion/IncursionTemplateMapper'
+import type Ability from '../../models/domain/ability/Ability'
+import AbilityMove from '../../models/domain/ability/abilities/AbilityMove'
+import AbilitySwiftStrike from '../../models/domain/ability/abilities/AbilitySwiftStrike'
+import ActionParams from '../../models/domain/incursion/ActionParams'
 import { CharacterModel } from '../../models/schemas/entity/CharacterSchema'
 import { IncursionInstanceModel } from '../../models/schemas/incursion/IncursionInstanceSchema'
 import { IncursionTemplateModel } from '../../models/schemas/incursion/IncursionTemplateSchema'
 import { safeHandler } from './safeHandler'
+
+function resolveAbility(abilityId: AbilityId): Ability | undefined {
+  switch (abilityId) {
+    case AbilityId.MOVE: return new AbilityMove()
+    case AbilityId.SWIFT_STRIKE: return new AbilitySwiftStrike()
+    default: return undefined
+  }
+}
 
 export function registerIncursionHandlers(io: Server, socket: Socket, incursionManager: IncursionManager) {
   socket.on('incursion:begin', safeHandler(async (_data, callback) => {
@@ -53,12 +67,45 @@ export function registerIncursionHandlers(io: Server, socket: Socket, incursionM
         } }
       )
 
-      incursionManager.addIncursion(saved._id.toString(), result)
+      const incursionId = saved._id.toString()
+      incursionManager.addIncursion(incursionId, result)
+      socket.join(incursionId)
+      socket.data.incursionId = incursionId
 
       callback(toDb)
     } catch (err) {
       console.error('Failed to save incursion', err)
       callback()
     }
+  }))
+
+  socket.on('incursion:action', safeHandler(async (data: IIncursionActionDto, callback) => {
+    const incursionId = socket.data.incursionId as string | undefined
+    if (!incursionId) {
+      callback?.()
+      return
+    }
+
+    const incursion = incursionManager.getIncursion(incursionId)
+    if (!incursion) {
+      callback?.()
+      return
+    }
+
+    const userEntity = incursion.findEntityById('character')
+    if (!userEntity) {
+      callback?.()
+      return
+    }
+
+    const ability = resolveAbility(data.abilityId)
+    if (!ability) {
+      callback?.()
+      return
+    }
+
+    const params = new ActionParams(data.direction, data.targetEntityId)
+    incursion.queueAction(userEntity.entity, ability, params)
+    callback?.({ queued: true })
   }))
 }

@@ -1,5 +1,7 @@
 <script lang="ts">
+import type CommunicationManager from '@/managers/CommunicationManager'
 import type Renderer from '@/rendering/Renderer'
+import { AbilityId, Direction, EntityKind } from '@incursion/dto'
 import { defineComponent, inject } from 'vue'
 import NotificationManager from '@/managers/NotificationManager'
 import { useCharacterStore } from '@/stores/CharacterStore'
@@ -12,8 +14,9 @@ export default defineComponent({
     const characterStore = useCharacterStore()
     const incursionStore = useIncursionStore()
     const renderer = inject('renderer') as Renderer
+    const comm = inject('communicationManager') as CommunicationManager
 
-    return { characterStore, incursionStore, renderer }
+    return { characterStore, incursionStore, renderer, comm }
   },
 
   data() {
@@ -41,10 +44,38 @@ export default defineComponent({
     this.renderer.buildIncursionScene(incursion)
     this.renderer.startRendering()
 
+    // Register state update handler to re-render entities
+    this.incursionStore.registerStateUpdateHandler(this.comm, (entities) => {
+      this.renderer.updateEntityPositions(entities)
+    })
+
     this.onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F3') {
         e.preventDefault()
         this.renderer.toggleDebugHelpers()
+        return
+      }
+
+      const key = e.key.toLowerCase()
+
+      // WASD movement
+      if (key === 'w') {
+        this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction: Direction.UP })
+      } else if (key === 's') {
+        this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction: Direction.DOWN })
+      } else if (key === 'a') {
+        this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction: Direction.LEFT })
+      } else if (key === 'd') {
+        this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction: Direction.RIGHT })
+      }
+
+      // Space for attack
+      if (key === ' ') {
+        e.preventDefault()
+        const targetId = this.findAdjacentEnemy()
+        if (targetId) {
+          this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.SWIFT_STRIKE, targetEntityId: targetId })
+        }
       }
     }
     window.addEventListener('keydown', this.onKeyDown)
@@ -53,6 +84,31 @@ export default defineComponent({
   unmounted() {
     if (this.onKeyDown) {
       window.removeEventListener('keydown', this.onKeyDown)
+    }
+    this.incursionStore.unregisterStateUpdateHandler(this.comm)
+  },
+
+  methods: {
+    findAdjacentEnemy(): string | undefined {
+      const incursion = this.incursionStore.incursion
+      if (!incursion) return undefined
+
+      const player = incursion.currentRoom.entities.find(
+        e => e.entity.kind === EntityKind.CHARACTER
+      )
+      if (!player) return undefined
+
+      for (const iie of incursion.currentRoom.entities) {
+        if (iie.entity.kind === EntityKind.ADVERSARY) {
+          const dx = Math.abs(player.position.x - iie.position.x)
+          const dy = Math.abs(player.position.y - iie.position.y)
+          if (dx + dy === 1) {
+            return iie.entity.entityId
+          }
+        }
+      }
+
+      return undefined
     }
   }
 })

@@ -1,16 +1,19 @@
-import type { IIncursionDto } from '@incursion/dto'
+import type { IIncursionActionDto, IIncursionDto, IIncursionEventDto, IIncursionStateUpdateDto } from '@incursion/dto'
 import type Incursion from '@/datatypes/business/incursion/Incursion'
+import type IncursionInstanceEntity from '@/datatypes/business/entity/IncursionInstanceEntity'
 import type { Result } from '@/datatypes/util/Result'
 import type CommunicationManager from '@/managers/CommunicationManager'
 import { defineStore } from 'pinia'
 import NotificationManager from '@/managers/NotificationManager'
+import IncursionInstanceEntityMapper from '@/mappers/IncursionInstanceEntityMapper'
 import IncursionMapper from '@/mappers/IncursionMapper'
 
 export const useIncursionStore = defineStore('incursion', {
   state: () => {
     return {
       isViewingIncursion: false,
-      incursion: undefined as Incursion | undefined
+      incursion: undefined as Incursion | undefined,
+      lastEvents: [] as IIncursionEventDto[]
     }
   },
 
@@ -41,6 +44,26 @@ export const useIncursionStore = defineStore('incursion', {
           error: err as Error
         }
       }
+    },
+
+    sendAction(comm: CommunicationManager, action: IIncursionActionDto) {
+      comm.socketEmit('incursion:action', action)
+    },
+
+    registerStateUpdateHandler(comm: CommunicationManager, onUpdate: (entities: IncursionInstanceEntity[]) => void) {
+      comm.onSocket<IIncursionStateUpdateDto>('incursion:stateUpdate', (data) => {
+        if (!this.incursion) return
+
+        this.incursion.currentRoom.entities = data.entities.map(
+          e => IncursionInstanceEntityMapper.toDomain(e)
+        )
+        this.lastEvents = data.events
+        onUpdate(this.incursion.currentRoom.entities)
+      })
+    },
+
+    unregisterStateUpdateHandler(comm: CommunicationManager) {
+      comm.offSocket('incursion:stateUpdate')
     }
   }
 })

@@ -1,9 +1,12 @@
 import type Renderer from '../Renderer'
 import type Character from '@/datatypes/business/entity/Character'
 import type Incursion from '@/datatypes/business/incursion/Incursion'
+import type IncursionInstanceEntity from '@/datatypes/business/entity/IncursionInstanceEntity'
 import { AmbientLight, Color, DirectionalLight, Vector2, Vector3 } from 'three'
+import { EntityKind } from '@incursion/dto'
 import CharacterModel from '../game-objects/character-models.ts/CharacterModel'
 import EntityModel from '../game-objects/character-models.ts/EntityModel'
+import type GraphicObject from '../GraphicObject'
 import Grid from '../Grid'
 import TransparentCuboid from '../shapes/TransparentCuboid'
 import SceneBuilder from './SceneBuilder'
@@ -12,6 +15,7 @@ export default class IncursionSceneBuilder extends SceneBuilder {
   private FLOOR_HEIGHT = 800
   private grid: Grid
   private floorSize = 150
+  private entityModels: Map<string, GraphicObject> = new Map()
 
   public constructor(renderer: Renderer, public incursion: Incursion) {
     super(renderer)
@@ -48,16 +52,36 @@ export default class IncursionSceneBuilder extends SceneBuilder {
 
   private buildEntities() {
     for (const iie of this.incursion.currentRoom.entities) {
-      // TODO: change this into enum
-      // TODO: use positions of InursionInstanceEntities
-      if (iie.entity.entityId === 'character') {
+      if (iie.entity.kind === EntityKind.CHARACTER) {
         const characterModel = new CharacterModel(iie as unknown as Character).assemble()
         this.grid.add(characterModel)
         this.grid.placeAt(characterModel, new Vector2(iie.position.x, iie.position.y))
+        this.entityModels.set(iie.entity.entityId, characterModel)
       } else {
         const entityModel = new EntityModel(iie.entity).assemble()
         this.grid.add(entityModel)
         this.grid.placeAt(entityModel, new Vector2(iie.position.x, iie.position.y))
+        this.entityModels.set(iie.entity.entityId, entityModel)
+      }
+    }
+  }
+
+  public updateEntityPositions(entities: IncursionInstanceEntity[]) {
+    const currentIds = new Set(entities.map(e => e.entity.entityId))
+
+    // Remove models for dead entities
+    for (const [entityId, model] of this.entityModels) {
+      if (!currentIds.has(entityId)) {
+        this.grid.remove(model)
+        this.entityModels.delete(entityId)
+      }
+    }
+
+    // Update positions for existing entities
+    for (const iie of entities) {
+      const model = this.entityModels.get(iie.entity.entityId)
+      if (model) {
+        this.grid.placeAt(model, new Vector2(iie.position.x, iie.position.y))
       }
     }
   }

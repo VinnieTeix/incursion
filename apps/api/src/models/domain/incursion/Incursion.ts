@@ -1,14 +1,16 @@
-import type { IncursionId, IncursionTheme } from '@incursion/dto'
+import type { IIncursionEventDto, IncursionId, IncursionTheme } from '@incursion/dto'
 import type Ability from '../ability/Ability'
-import type Character from '../entity/Character'
 import type Entity from '../entity/Entity'
+import type IncursionInstanceEntity from '../entity/IncursionInstanceEntity'
+import type ActionParams from './ActionParams'
 import type IncursionRoom from './IncursionRoom'
-import { EntityKind } from '@incursion/dto'
+import Position from './Position'
 
 export default class Incursion {
   private queuedActions: {
     user: Entity
     action: Ability
+    params: ActionParams
   }[] = []
 
   public constructor(
@@ -20,22 +22,34 @@ export default class Incursion {
     public theme: IncursionTheme
   ) {}
 
-  public tick(delta: number) {
-
+  public tick(delta: number): IIncursionEventDto[] {
+    const events = this.processQueuedActions()
+    this.processCooldowns(delta)
+    return events
   }
 
-  public queueAction(user: Entity, action: Ability) {
-    if (action.canUse(user, this)) {
-      this.queuedActions.push({ user, action })
+  public queueAction(user: Entity, action: Ability, params: ActionParams) {
+    // Deduplicate: one action per entity per tick
+    const existing = this.queuedActions.findIndex(qa => qa.user.entityId === user.entityId)
+    if (existing !== -1) {
+      this.queuedActions[existing] = { user, action, params }
+    } else if (action.canUse(user, this, params)) {
+      this.queuedActions.push({ user, action, params })
     } else {
       console.warn(`${user.entityId} tried to use ${action.abilityId} but can't use it.`)
     }
   }
 
-  public processQueuedActions() {
+  public processQueuedActions(): IIncursionEventDto[] {
+    const events: IIncursionEventDto[] = []
     for (const qa of this.queuedActions) {
-      qa.action.execute(qa.user, this)
+      const event = qa.action.execute(qa.user, this, qa.params)
+      if (event) {
+        events.push(event)
+      }
     }
+    this.queuedActions = []
+    return events
   }
 
   public processCooldowns(delta: number) {
@@ -43,5 +57,28 @@ export default class Incursion {
       // reduce cooldown timer
       // TODO: add AbilityInstance to iie
     }
+  }
+
+  public findEntityById(entityId: string): IncursionInstanceEntity | undefined {
+    return this.currentRoom.entities.find(iie => iie.entity.entityId === entityId)
+  }
+
+  public getEntityAt(position: Position): IncursionInstanceEntity | undefined {
+    return this.currentRoom.entities.find(
+      iie => iie.position.x === position.x && iie.position.y === position.y
+    )
+  }
+
+  public isInBounds(position: Position): boolean {
+    return position.x >= 0
+      && position.x < this.currentRoom.width
+      && position.y >= 0
+      && position.y < this.currentRoom.height
+  }
+
+  public removeEntity(entityId: string): void {
+    this.currentRoom.entities = this.currentRoom.entities.filter(
+      iie => iie.entity.entityId !== entityId
+    )
   }
 }

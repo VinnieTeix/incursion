@@ -1,4 +1,6 @@
+import type { Server } from 'socket.io'
 import type Incursion from '../models/domain/incursion/Incursion'
+import IncursionInstanceEntityMapper from '../mappers/entity/IncursionInstanceEntityMapper'
 
 const TICK_RATE = 20
 const TICK_INTERVAL = 1000 / TICK_RATE
@@ -7,6 +9,8 @@ export default class IncursionManager {
   private incursions: Map<string, Incursion> = new Map()
   private intervalId: ReturnType<typeof setInterval> | null = null
   private lastTime = Date.now()
+
+  public constructor(private io: Server) {}
 
   public addIncursion(id: string, incursion: Incursion) {
     this.incursions.set(id, incursion)
@@ -29,8 +33,11 @@ export default class IncursionManager {
   }
 
   private start() {
+    this.lastTime = Date.now()
     this.intervalId = setInterval(() => {
-      const delta = Date.now() - this.lastTime
+      const now = Date.now()
+      const delta = now - this.lastTime
+      this.lastTime = now
 
       this.tick(delta)
     }, TICK_INTERVAL)
@@ -44,6 +51,15 @@ export default class IncursionManager {
   }
 
   private tick(delta: number) {
-    // TODO: implement tick logic for all active incursions
+    for (const [id, incursion] of this.incursions) {
+      const events = incursion.tick(delta)
+
+      if (events.length > 0) {
+        this.io.to(id).emit('incursion:stateUpdate', {
+          entities: incursion.currentRoom.entities.map(e => IncursionInstanceEntityMapper.toDto(e)),
+          events
+        })
+      }
+    }
   }
 }

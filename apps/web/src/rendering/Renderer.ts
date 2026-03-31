@@ -1,5 +1,6 @@
 import type LoadedResources from './LoadedResources'
 import type Incursion from '@/datatypes/business/incursion/Incursion'
+import type IncursionInstanceEntity from '@/datatypes/business/entity/IncursionInstanceEntity'
 import {
   AxesHelper,
   GridHelper,
@@ -39,6 +40,7 @@ export default class Renderer {
   public controls!: OrbitControls
   public currentIncursion: Incursion | undefined
 
+  private incursionSceneBuilder: IncursionSceneBuilder | undefined
   private debugHelpersVisible = false
   private axesHelper = new AxesHelper(300)
   private gridHelper = new GridHelper(3000, 20, 0xFF0000, 0xFFFFFF)
@@ -165,9 +167,13 @@ export default class Renderer {
   }
 
   public buildIncursionScene(incursion: Incursion) {
-    const incursionSceneBuilder = new IncursionSceneBuilder(this, incursion)
-    incursionSceneBuilder.buildScene()
-    this.currentScene.add(incursionSceneBuilder.scene)
+    this.incursionSceneBuilder = new IncursionSceneBuilder(this, incursion)
+    this.incursionSceneBuilder.buildScene()
+    this.currentScene.add(this.incursionSceneBuilder.scene)
+  }
+
+  public updateEntityPositions(entities: IncursionInstanceEntity[]) {
+    this.incursionSceneBuilder?.updateEntityPositions(entities)
   }
 
   public startRendering() {

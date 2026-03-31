@@ -1,7 +1,8 @@
 import type Character from '../models/domain/entity/Character'
 import type IIncursionTemplate from '../models/interfaces/incursion/IIncursionTemplate'
-import { AdversaryId, EntityKind, IncursionRoomType } from '@incursion/dto'
+import { AdversaryId, EntityKind, EntityStatId, IncursionRoomType } from '@incursion/dto'
 import Entity from '../models/domain/entity/Entity'
+import EntityStat from '../models/domain/entity/EntityStat'
 import IncursionInstanceEntity from '../models/domain/entity/IncursionInstanceEntity'
 import Incursion from '../models/domain/incursion/Incursion'
 import IncursionRoom from '../models/domain/incursion/IncursionRoom'
@@ -25,7 +26,10 @@ export default class IncursionGenerator {
               kind: EntityKind.ADVERSARY,
               entityId: AdversaryId.GHOUL,
               name: AdversaryId.GHOUL,
-              stats: []
+              stats: [
+                new EntityStat(EntityStatId.HEALTH, 50, []),
+                new EntityStat(EntityStatId.STRENGTH, 5, [])
+              ]
             }
           ),
           new Position(3, 3)
