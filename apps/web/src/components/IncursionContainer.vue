@@ -57,6 +57,7 @@ export default defineComponent({
       }
 
       const key = e.key.toLowerCase()
+      console.log('Key pressed:', key)
 
       // WASD movement
       if (key === 'w') {

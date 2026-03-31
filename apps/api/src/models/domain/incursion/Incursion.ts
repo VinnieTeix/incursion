@@ -42,8 +42,10 @@ export default class Incursion {
 
   public processQueuedActions(): IIncursionEventDto[] {
     const events: IIncursionEventDto[] = []
+    console.log('Processing', this.queuedActions.length, 'queued actions')
     for (const qa of this.queuedActions) {
       const event = qa.action.execute(qa.user, this, qa.params)
+      console.log('Action result:', event)
       if (event) {
         events.push(event)
       }

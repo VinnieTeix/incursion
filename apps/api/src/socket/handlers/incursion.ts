@@ -80,6 +80,7 @@ export function registerIncursionHandlers(io: Server, socket: Socket, incursionM
   }))
 
   socket.on('incursion:action', safeHandler(async (data: IIncursionActionDto, callback) => {
+    console.log('Received action:', data)
     const incursionId = socket.data.incursionId as string | undefined
     if (!incursionId) {
       callback?.()
