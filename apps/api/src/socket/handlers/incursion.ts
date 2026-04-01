@@ -79,25 +79,57 @@ export function registerIncursionHandlers(io: Server, socket: Socket, incursionM
     }
   }))
 
+  socket.on('incursion:join', safeHandler(async (_data, callback) => {
+    const characterDoc = await CharacterModel.findOne({
+      owner: socket.data.userId
+    }).lean()
+
+    if (!characterDoc?.currentIncursion) {
+      callback?.()
+      return
+    }
+
+    const incursionId = characterDoc.currentIncursion.toString()
+
+    // Load into manager if not already present
+    if (!incursionManager.getIncursion(incursionId)) {
+      const incursionDoc = await IncursionInstanceModel.findById(incursionId).lean()
+      if (!incursionDoc) {
+        callback?.()
+        return
+      }
+      const incursion = IncursionMapper.toDomain(incursionDoc)
+      incursionManager.addIncursion(incursionId, incursion)
+    }
+
+    socket.join(incursionId)
+    socket.data.incursionId = incursionId
+    callback?.({ joined: true })
+  }))
+
   socket.on('incursion:action', safeHandler(async (data: IIncursionActionDto, callback) => {
     console.log('Received action:', data)
     const incursionId = socket.data.incursionId as string | undefined
     if (!incursionId) {
+      console.log('No incursionId on socket')
       callback?.()
       return
     }
 
     const incursion = incursionManager.getIncursion(incursionId)
     if (!incursion) {
+      console.log('Incursion not found in manager for id:', incursionId)
       callback?.()
       return
     }
 
     const userEntity = incursion.findEntityById('character')
     if (!userEntity) {
+      console.log('Could not find character entity. Entities:', incursion.currentRoom.entities.map(e => e.entity.entityId))
       callback?.()
       return
     }
+    console.log('Found character at:', userEntity.position.x, userEntity.position.y)
 
     const ability = resolveAbility(data.abilityId)
     if (!ability) {

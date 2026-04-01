@@ -21,7 +21,8 @@ export default defineComponent({
 
   data() {
     return {
-      onKeyDown: null as ((e: KeyboardEvent) => void) | null
+      onKeyDown: null as ((e: KeyboardEvent) => void) | null,
+      onClick: null as ((e: MouseEvent) => void) | null
     }
   },
 
@@ -55,36 +56,42 @@ export default defineComponent({
         this.renderer.toggleDebugHelpers()
         return
       }
-
-      const key = e.key.toLowerCase()
-      console.log('Key pressed:', key)
-
-      // WASD movement
-      if (key === 'w') {
-        this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction: Direction.UP })
-      } else if (key === 's') {
-        this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction: Direction.DOWN })
-      } else if (key === 'a') {
-        this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction: Direction.LEFT })
-      } else if (key === 'd') {
-        this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction: Direction.RIGHT })
-      }
-
-      // Space for attack
-      if (key === ' ') {
-        e.preventDefault()
-        const targetId = this.findAdjacentEnemy()
-        if (targetId) {
-          this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.SWIFT_STRIKE, targetEntityId: targetId })
-        }
-      }
     }
     window.addEventListener('keydown', this.onKeyDown)
+
+    this.onClick = (e: MouseEvent) => {
+      const tileCoord = this.renderer.raycastTile(e)
+      if (!tileCoord) return
+
+      const player = this.incursionStore.incursion?.currentRoom.entities.find(
+        ent => ent.entity.kind === EntityKind.CHARACTER
+      )
+      if (!player) return
+
+      const dx = tileCoord.x - player.position.x
+      const dy = tileCoord.y - player.position.y
+
+      // Only allow 1-tile cardinal movement
+      if (Math.abs(dx) + Math.abs(dy) !== 1) return
+
+      let direction: Direction
+      if (dx === 1) direction = Direction.RIGHT
+      else if (dx === -1) direction = Direction.LEFT
+      else if (dy === -1) direction = Direction.UP
+      else direction = Direction.DOWN
+
+      this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction })
+    }
+    canvas.addEventListener('click', this.onClick)
   },
 
   unmounted() {
     if (this.onKeyDown) {
       window.removeEventListener('keydown', this.onKeyDown)
+    }
+    if (this.onClick) {
+      const canvas = this.$refs.canvas as HTMLCanvasElement
+      canvas?.removeEventListener('click', this.onClick)
     }
     this.incursionStore.unregisterStateUpdateHandler(this.comm)
   },

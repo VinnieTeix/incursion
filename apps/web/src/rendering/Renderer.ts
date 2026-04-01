@@ -1,6 +1,7 @@
 import type LoadedResources from './LoadedResources'
 import type Incursion from '@/datatypes/business/incursion/Incursion'
 import type IncursionInstanceEntity from '@/datatypes/business/entity/IncursionInstanceEntity'
+import type Tile from './game-objects/Tile'
 import {
   AxesHelper,
   GridHelper,
@@ -196,6 +197,25 @@ export default class Renderer {
       this.currentScene.remove(this.axesHelper)
       this.currentScene.remove(this.gridHelper)
     }
+  }
+
+  public raycastTile(event: MouseEvent): Vector2 | null {
+    const canvas = this.webGLRenderer.domElement
+    const rect = canvas.getBoundingClientRect()
+    this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+    this.raycaster.setFromCamera(this.pointer, this.camera)
+    const intersects = this.raycaster.intersectObjects(this.currentScene.children, true)
+
+    for (const hit of intersects) {
+      let obj = hit.object as any
+      while (obj) {
+        if (obj.coord) return (obj as Tile).coord
+        obj = obj.parent
+      }
+    }
+    return null
   }
 
   public static getCSSVar(name: string) {

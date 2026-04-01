@@ -31,6 +31,7 @@ export default defineComponent({
   methods: {
     async beginIncursion() {
       if (this.incursionStore.incursion) {
+        await this.communicationManager.socketEmit('incursion:join')
         this.incursionStore.isViewingIncursion = true
         NotificationManager.info('Incursion exists, viewing incursion now.')
         return
