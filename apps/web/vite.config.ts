@@ -13,9 +13,9 @@ export default defineConfig({
   server: {
     fs: { strict: false },
     proxy: {
-      '/api': 'http://localhost:3000',
+      '/api': process.env.API_URL || 'http://localhost:3000',
       '/socket.io': {
-        target: 'http://localhost:3000',
+        target: process.env.API_URL || 'http://localhost:3000',
         ws: true
       }
     }
