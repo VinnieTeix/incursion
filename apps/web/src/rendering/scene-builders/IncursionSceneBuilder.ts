@@ -3,7 +3,7 @@ import type Character from '@/datatypes/business/entity/Character'
 import type Incursion from '@/datatypes/business/incursion/Incursion'
 import type IncursionInstanceEntity from '@/datatypes/business/entity/IncursionInstanceEntity'
 import { AmbientLight, Color, DirectionalLight, Vector2, Vector3 } from 'three'
-import { EntityKind } from '@incursion/dto'
+import { EntityKind, EntityStatId } from '@incursion/dto'
 import CharacterModel from '../game-objects/character-models.ts/CharacterModel'
 import EntityModel from '../game-objects/character-models.ts/EntityModel'
 import type GraphicObject from '../GraphicObject'
@@ -84,6 +84,43 @@ export default class IncursionSceneBuilder extends SceneBuilder {
         this.grid.placeAt(model, new Vector2(iie.position.x, iie.position.y))
       }
     }
+  }
+
+  public highlightValidMoves(entities: IncursionInstanceEntity[]) {
+    const player = entities.find(e => e.entity.kind === EntityKind.CHARACTER)
+    if (!player) {
+      this.grid.clearHighlights()
+      return
+    }
+
+    const moveRange = player.entity.stats.find(s => s.statId === EntityStatId.MOVE_RANGE)?.currentValue ?? 1
+    const px = player.position.x
+    const py = player.position.y
+    const validTiles: Vector2[] = []
+
+    // 8 directions: cardinal + diagonal
+    const directions = [
+      { dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
+      { dx: -1, dy: -1 }, { dx: 1, dy: -1 }, { dx: -1, dy: 1 }, { dx: 1, dy: 1 }
+    ]
+
+    for (const dir of directions) {
+      for (let dist = 1; dist <= moveRange; dist++) {
+        const tx = px + dir.dx * dist
+        const ty = py + dir.dy * dist
+
+        // Out of bounds — stop in this direction
+        if (tx < 0 || tx >= this.incursion.currentRoom.width || ty < 0 || ty >= this.incursion.currentRoom.height) break
+
+        // Occupied — stop in this direction
+        const occupied = entities.some(e => e.position.x === tx && e.position.y === ty)
+        if (occupied) break
+
+        validTiles.push(new Vector2(tx, ty))
+      }
+    }
+
+    this.grid.highlightTiles(validTiles)
   }
 
   public animateScene(): void {

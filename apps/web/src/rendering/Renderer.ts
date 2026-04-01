@@ -171,10 +171,12 @@ export default class Renderer {
     this.incursionSceneBuilder = new IncursionSceneBuilder(this, incursion)
     this.incursionSceneBuilder.buildScene()
     this.currentScene.add(this.incursionSceneBuilder.scene)
+    this.incursionSceneBuilder.highlightValidMoves(incursion.currentRoom.entities)
   }
 
   public updateEntityPositions(entities: IncursionInstanceEntity[]) {
     this.incursionSceneBuilder?.updateEntityPositions(entities)
+    this.incursionSceneBuilder?.highlightValidMoves(entities)
   }
 
   public startRendering() {

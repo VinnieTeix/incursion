@@ -1,7 +1,7 @@
 <script lang="ts">
 import type CommunicationManager from '@/managers/CommunicationManager'
 import type Renderer from '@/rendering/Renderer'
-import { AbilityId, Direction, EntityKind } from '@incursion/dto'
+import { AbilityId, EntityKind } from '@incursion/dto'
 import { defineComponent, inject } from 'vue'
 import NotificationManager from '@/managers/NotificationManager'
 import { useCharacterStore } from '@/stores/CharacterStore'
@@ -70,17 +70,15 @@ export default defineComponent({
 
       const dx = tileCoord.x - player.position.x
       const dy = tileCoord.y - player.position.y
+      if (dx === 0 && dy === 0) return
 
-      // Only allow 1-tile cardinal movement
-      if (Math.abs(dx) + Math.abs(dy) !== 1) return
+      // Must be a straight line (cardinal or diagonal)
+      if (dx !== 0 && dy !== 0 && Math.abs(dx) !== Math.abs(dy)) return
 
-      let direction: Direction
-      if (dx === 1) direction = Direction.RIGHT
-      else if (dx === -1) direction = Direction.LEFT
-      else if (dy === -1) direction = Direction.UP
-      else direction = Direction.DOWN
-
-      this.incursionStore.sendAction(this.comm, { abilityId: AbilityId.MOVE, direction })
+      this.incursionStore.sendAction(this.comm, {
+        abilityId: AbilityId.MOVE,
+        targetPosition: { x: tileCoord.x, y: tileCoord.y }
+      })
     }
     canvas.addEventListener('click', this.onClick)
   },

@@ -137,7 +137,7 @@ export function registerIncursionHandlers(io: Server, socket: Socket, incursionM
       return
     }
 
-    const params = new ActionParams(data.direction, data.targetEntityId)
+    const params = new ActionParams(data.direction, data.targetEntityId, data.targetPosition)
     incursion.queueAction(userEntity.entity, ability, params)
     callback?.({ queued: true })
   }))

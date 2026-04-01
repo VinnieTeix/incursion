@@ -60,6 +60,11 @@ export default class CharacterGenerator {
         statId: EntityStatId.MOVEMENT_SPEED,
         baseValue: 1,
         buffs: []
+      },
+      {
+        statId: EntityStatId.MOVE_RANGE,
+        baseValue: 1,
+        buffs: []
       }
     ]
   }

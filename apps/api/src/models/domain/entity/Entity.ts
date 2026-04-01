@@ -1,4 +1,4 @@
-import type { EntityKind } from '@incursion/dto'
+import type { EntityKind, EntityStatId } from '@incursion/dto'
 import type EntityStat from './EntityStat'
 import type IEntityConfig from './IEntityConfig'
 
@@ -13,5 +13,9 @@ export default class Entity {
     this.entityId = config.entityId
     this.name = config.name
     this.stats = config.stats
+  }
+
+  public getStat(statId: EntityStatId): EntityStat | undefined {
+    return this.stats.find(s => s.statId === statId)
   }
 }

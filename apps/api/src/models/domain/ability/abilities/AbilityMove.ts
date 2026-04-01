@@ -3,17 +3,29 @@ import type Entity from '../../entity/Entity'
 import type Incursion from '../../incursion/Incursion'
 import type ActionParams from '../../incursion/ActionParams'
 import type IAbilityConfig from '../IAbilityConfig'
-import { AbilityId, Direction, TargetType } from '@incursion/dto'
+import { AbilityId, EntityStatId, TargetType } from '@incursion/dto'
 import Position from '../../incursion/Position'
 import Ability from '../Ability'
 
-function directionToOffset(direction: Direction): { dx: number, dy: number } {
-  switch (direction) {
-    case Direction.UP: return { dx: 0, dy: -1 }
-    case Direction.DOWN: return { dx: 0, dy: 1 }
-    case Direction.LEFT: return { dx: -1, dy: 0 }
-    case Direction.RIGHT: return { dx: 1, dy: 0 }
+/**
+ * Returns all integer grid positions along the line from (x0,y0) to (x1,y1),
+ * excluding the start position.
+ */
+function getLineTiles(x0: number, y0: number, x1: number, y1: number): Position[] {
+  const tiles: Position[] = []
+  const dx = Math.sign(x1 - x0)
+  const dy = Math.sign(y1 - y0)
+  let x = x0 + dx
+  let y = y0 + dy
+
+  const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))
+  for (let i = 0; i < steps; i++) {
+    tiles.push(new Position(x, y))
+    x += dx
+    y += dy
   }
+
+  return tiles
 }
 
 export default class AbilityMove extends Ability {
@@ -21,18 +33,18 @@ export default class AbilityMove extends Ability {
     const config: IAbilityConfig = {
       abilityId: AbilityId.MOVE,
       name: 'MOVE',
-      description: 'Move 1 unit up, down, left or right.',
+      description: 'Move up to your move range in a straight line (cardinal or diagonal).',
       cooldown: 1,
       targetType: TargetType.SELF,
+
       effect: function (user: Entity, context: Incursion, params: ActionParams): IIncursionEventDto | null {
-        if (params.direction == null) return null
+        if (!params.targetPosition) return null
 
         const iie = context.findEntityById(user.entityId)
         if (!iie) return null
 
-        const { dx, dy } = directionToOffset(params.direction)
-        iie.position.x += dx
-        iie.position.y += dy
+        iie.position.x = params.targetPosition.x
+        iie.position.y = params.targetPosition.y
 
         return {
           type: 'move',
@@ -40,17 +52,35 @@ export default class AbilityMove extends Ability {
           position: { x: iie.position.x, y: iie.position.y }
         }
       },
+
       condition: function (user: Entity, context: Incursion, params: ActionParams): boolean {
-        if (params.direction == null) return false
+        if (!params.targetPosition) return false
 
         const iie = context.findEntityById(user.entityId)
         if (!iie) return false
 
-        const { dx, dy } = directionToOffset(params.direction)
-        const targetPos = new Position(iie.position.x + dx, iie.position.y + dy)
+        const dx = params.targetPosition.x - iie.position.x
+        const dy = params.targetPosition.y - iie.position.y
+        if (dx === 0 && dy === 0) return false
 
+        // Must be a straight line (cardinal or diagonal)
+        if (dx !== 0 && dy !== 0 && Math.abs(dx) !== Math.abs(dy)) return false
+
+        // Check move range (Chebyshev distance)
+        const distance = Math.max(Math.abs(dx), Math.abs(dy))
+        const moveRange = user.getStat(EntityStatId.MOVE_RANGE)?.currentValue ?? 1
+        if (distance > moveRange) return false
+
+        // Validate target is in bounds
+        const targetPos = new Position(params.targetPosition.x, params.targetPosition.y)
         if (!context.isInBounds(targetPos)) return false
-        if (context.getEntityAt(targetPos)) return false
+
+        // Validate every tile along the path is in bounds and unoccupied
+        const pathTiles = getLineTiles(iie.position.x, iie.position.y, params.targetPosition.x, params.targetPosition.y)
+        for (const tile of pathTiles) {
+          if (!context.isInBounds(tile)) return false
+          if (context.getEntityAt(tile)) return false
+        }
 
         return true
       }
